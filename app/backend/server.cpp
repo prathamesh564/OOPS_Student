@@ -1,13 +1,11 @@
 #include "crow_all.h"
 #include <unordered_map>
 #include <string>
+#include <sstream>
+#include <iostream>
 
 struct Student {
-    std::string name;
-    std::string usn;
-    std::string section;
-    std::string department;
-    std::string contact;
+    std::string name, usn, section, department, contact;
 };
 
 std::unordered_map<int, Student> db = {
@@ -16,28 +14,41 @@ std::unordered_map<int, Student> db = {
     {103, {"Arjun Patil", "1RV23ME103", "C", "MECH", "9876501234"}}
 };
 
-int main()
-{
+int main() {
     crow::SimpleApp app;
 
-    // Route: Fetch student details using roll number
-    CROW_ROUTE(app, "/student/<int>")
-    ([](int roll){
-        if (db.count(roll) == 0) {
-            return crow::response(404, "Student Not Found");
-        }
+    // Register API endpoint
+    app.add_route("/student", [&](const std::string& url) -> crow::response {
+        auto pos = url.find("roll=");
+        if (pos == std::string::npos)
+            return crow::response(400, "{\"error\":\"Missing roll number\"}");
 
-        const Student &s = db[roll];
+        int roll;
+        std::istringstream(url.substr(pos + 5)) >> roll;
 
-        crow::json::wvalue res;
+        if (db.count(roll) == 0)
+            return crow::response(404, "{\"error\":\"Student Not Found\"}");
+
+        const auto& s = db[roll];
+        crow::json_wvalue res;
         res["name"] = s.name;
         res["usn"] = s.usn;
         res["section"] = s.section;
         res["department"] = s.department;
         res["contact"] = s.contact;
 
-        return crow::response(res);
+        return crow::response(200, res.dump());
     });
 
-    app.port(5000).multithreaded().run();
+    // Simulate GET requests (like a backend API call)
+    std::string test_url = "/student?roll=101";
+    std::cout << app.handle_request(test_url).body << std::endl;
+
+    test_url = "/student?roll=105";
+    std::cout << app.handle_request(test_url).body << std::endl;
+
+    test_url = "/student";
+    std::cout << app.handle_request(test_url).body << std::endl;
+
+    return 0;
 }
